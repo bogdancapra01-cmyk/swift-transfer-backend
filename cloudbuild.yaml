@@ -25,3 +25,6 @@ steps:
 
 images:
   - europe-west1-docker.pkg.dev/wave9-calind-447214/swift-transfer-repo/swift-transfer-be:$COMMIT_SHA
+  
+options:
+  logging: CLOUD_LOGGING_ONLY
