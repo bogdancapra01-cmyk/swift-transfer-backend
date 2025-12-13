@@ -1,18 +1,14 @@
-import dotenv from "dotenv";
-import { z } from "zod";
+function required(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env var: ${name}`);
+  return v;
+}
 
-dotenv.config();
+export const env = {
+  NODE_ENV: process.env.NODE_ENV ?? "development",
 
-const EnvSchema = z.object({
-  PORT: z.string().optional(),
-  NODE_ENV: z.enum(["development", "test", "production"]).optional(),
+  GCP_PROJECT_ID: required("GCP_PROJECT_ID"),
+  GCS_BUCKET: required("GCS_BUCKET"),
+  PORT: process.env.PORT ?? "8080",
 
-  GCP_PROJECT_ID: z.string().optional(),
-  GCS_BUCKET: z.string().optional(),
-
-  MAILGUN_API_KEY: z.string().optional(),
-  MAILGUN_DOMAIN: z.string().optional(),
-  MAILGUN_FROM: z.string().optional()
-});
-
-export const env = EnvSchema.parse(process.env);
+};

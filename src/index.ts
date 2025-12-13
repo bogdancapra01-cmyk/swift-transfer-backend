@@ -2,7 +2,10 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import "dotenv/config";
 import { env } from "./env";
+import transfersRouter from "./routes/transfers";
+
 
 const app = express();
 
@@ -18,6 +21,9 @@ app.use(
   })
 );
 
+app.use("/api/transfers", transfersRouter);
+
+
 // logging
 app.use(morgan("tiny"));
 
@@ -29,7 +35,8 @@ app.get("/health", (_req, res) => {
   });
 });
 
-const port = Number(env.PORT ?? 8080);
+const port = Number(env.PORT);
+
 app.listen(port, () => {
   console.log(`✅ Swift Transfer BE listening on port ${port}`);
 });
