@@ -22,6 +22,8 @@
   },
   "homepage": "https://github.com/bogdancapra01-cmyk/swift-transfer-backend#readme",
   "dependencies": {
+    "@google-cloud/firestore": "^8.0.0",
+    "@google-cloud/storage": "^7.18.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
