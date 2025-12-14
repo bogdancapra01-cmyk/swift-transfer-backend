@@ -3,6 +3,8 @@ import { z } from "zod";
 import crypto from "crypto";
 import { getUploadsBucket } from "../gcp/storage";
 import { firestore } from "../gcp/firestore";
+import fetch from "node-fetch";
+
 
 const router = Router();
 
@@ -224,8 +226,12 @@ router.get("/:transferId/files/:index/download", async (req, res) => {
       .status(500)
       .json({ ok: false, error: e?.message ?? "Internal error" });
   }
+});
 
-    const EmailSchema = z.object({
+/**
+ * EMAIL share link via Mailgun
+ */
+const EmailSchema = z.object({
   to: z.string().email(),
   message: z.string().max(2000).optional(),
 });
@@ -253,24 +259,27 @@ router.post("/:transferId/email", async (req, res) => {
       return res.status(409).json({ ok: false, error: "Transfer not ready" });
     }
 
-    if (data?.expiresAt && typeof data.expiresAt === "number" && Date.now() > data.expiresAt) {
+    if (
+      data?.expiresAt &&
+      typeof data.expiresAt === "number" &&
+      Date.now() > data.expiresAt
+    ) {
       return res.status(410).json({ ok: false, error: "Transfer expired" });
     }
 
-    // Construim shareUrl la fel ca în /complete
     const frontendBase =
       process.env.FRONTEND_URL ||
       "https://swift-transfer-fe-829099680012.europe-west1.run.app";
     const shareUrl = `${frontendBase.replace(/\/$/, "")}/t/${transferId}`;
 
-    // Mailgun (din Secret Manager -> env vars în Cloud Run)
     const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY;
     const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN;
 
     if (!MAILGUN_API_KEY || !MAILGUN_DOMAIN) {
       return res.status(500).json({
         ok: false,
-        error: "Mailgun not configured (MAILGUN_API_KEY / MAILGUN_DOMAIN missing)",
+        error:
+          "Mailgun not configured (MAILGUN_API_KEY / MAILGUN_DOMAIN missing)",
       });
     }
 
@@ -279,7 +288,10 @@ router.post("/:transferId/email", async (req, res) => {
 
     const files = Array.isArray(data?.files) ? data.files : [];
     const filesList = files
-      .map((f: any) => `• ${f?.name ?? "file"} (${Math.round((f?.size ?? 0) / 1024)} KB)`)
+      .map(
+        (f: any) =>
+          `• ${f?.name ?? "file"} (${Math.round((f?.size ?? 0) / 1024)} KB)`
+      )
       .join("\n");
 
     const text =
@@ -289,7 +301,6 @@ router.post("/:transferId/email", async (req, res) => {
       (message ? `Message:\n${message}\n\n` : "") +
       `This link may expire.`;
 
-    // Mailgun API (Basic Auth: api:<key>)
     const auth = Buffer.from(`api:${MAILGUN_API_KEY}`).toString("base64");
     const url = `https://api.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`;
 
@@ -310,19 +321,19 @@ router.post("/:transferId/email", async (req, res) => {
 
     if (!resp.ok) {
       const errText = await resp.text();
-      return res
-        .status(502)
-        .json({ ok: false, error: `Mailgun failed (${resp.status}): ${errText}` });
+      return res.status(502).json({
+        ok: false,
+        error: `Mailgun failed (${resp.status}): ${errText}`,
+      });
     }
 
     return res.json({ ok: true, shareUrl });
   } catch (e: any) {
     console.error("email error:", e);
-    return res.status(500).json({ ok: false, error: e?.message ?? "Internal error" });
+    return res
+      .status(500)
+      .json({ ok: false, error: e?.message ?? "Internal error" });
   }
-});
-  
-
 });
 
 export default router;
