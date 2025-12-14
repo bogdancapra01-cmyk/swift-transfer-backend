@@ -13,11 +13,20 @@ const app = express();
 app.use(helmet());
 app.use(express.json({ limit: "10mb" }));
 
+const allowedOrigins = [
+  "https://<URL-FRONTEND-CLOUD-RUN>",
+  "https://swift-transfer.app",
+];
+
 // CORS (în dev e OK wide-open; în prod îl restrângem la domeniul tău)
 app.use(
   cors({
-    origin: true,
-    credentials: true
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true); // Postman/curl
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
   })
 );
 
