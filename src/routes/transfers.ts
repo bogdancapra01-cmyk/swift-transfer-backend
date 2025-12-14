@@ -302,7 +302,7 @@ router.post("/:transferId/email", async (req, res) => {
       `This link may expire.`;
 
     const auth = Buffer.from(`api:${MAILGUN_API_KEY}`).toString("base64");
-    const url = `https://api.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`;
+    const url = `https://api.eu.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`;
 
     const form = new URLSearchParams();
     form.set("from", from);
