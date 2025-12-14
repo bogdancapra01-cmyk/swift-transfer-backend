@@ -22,15 +22,16 @@ const allowedOrigins = [
   "https://swift-transfer.app",
 ];
 
-// IMPORTANT: refolosim aceleași opțiuni și la preflight
 const corsOptions: cors.CorsOptions = {
   origin: (origin, cb) => {
     // allow server-to-server / curl / postman (no origin)
     if (!origin) return cb(null, true);
 
+    // allow only whitelisted origins
     if (allowedOrigins.includes(origin)) return cb(null, true);
 
-    return cb(new Error(`CORS blocked for origin: ${origin}`));
+    // IMPORTANT: don't throw error -> avoids 500 on preflight
+    return cb(null, false);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -38,14 +39,10 @@ const corsOptions: cors.CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Preflight (OPTIONS) trebuie să folosească aceleași corsOptions
-app.options("*", cors(corsOptions));
+app.options("*", cors(corsOptions)); // preflight
 
 // logging
 app.use(morgan("tiny"));
-
-app.use("/api/transfers", transfersRouter);
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -54,6 +51,35 @@ app.get("/health", (_req, res) => {
     env: env.NODE_ENV ?? "development",
   });
 });
+
+app.use("/api/transfers", transfersRouter);
+
+// OPTIONAL: dacă vrei să vezi clar când CORS blochează (în loc de 500)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && !allowedOrigins.includes(origin)) {
+    return res.status(403).json({
+      error: "CORS blocked",
+      origin,
+    });
+  }
+  next();
+});
+
+// error handler global (ca să nu mai primești HTML 500)
+app.use(
+  (
+    err: unknown,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction
+  ) => {
+    console.error("❌ Unhandled error:", err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Internal Server Error",
+    });
+  }
+);
 
 const port = Number(env.PORT);
 
