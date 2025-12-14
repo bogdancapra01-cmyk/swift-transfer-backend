@@ -12,12 +12,12 @@ const app = express();
 app.use(helmet());
 app.use(express.json({ limit: "10mb" }));
 
+/**
+ * ✅ CORS - focus pe Cloud Run (PROD)
+ * Acceptăm DOAR frontend-ul din Cloud Run + (opțional) domeniul tău.
+ * IMPORTANT: nu aruncăm Error în origin callback (altfel preflight poate da 500).
+ */
 const allowedOrigins = [
-  // DEV
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-
-  // PROD
   "https://swift-transfer-fe-829099680012.europe-west1.run.app",
   "https://swift-transfer.app",
 ];
@@ -30,19 +30,25 @@ const corsOptions: cors.CorsOptions = {
     // allow only whitelisted origins
     if (allowedOrigins.includes(origin)) return cb(null, true);
 
-    // IMPORTANT: don't throw error -> avoids 500 on preflight
+    // do NOT throw errors here -> avoids 500 on preflight
     return cb(null, false);
   },
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
 };
 
+// aplică CORS pentru toate request-urile
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // preflight
+
+// preflight (OPTIONS) pentru orice rută
+app.options("*", cors(corsOptions));
 
 // logging
 app.use(morgan("tiny"));
+
+// routes
+app.use("/api/transfers", transfersRouter);
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -50,20 +56,6 @@ app.get("/health", (_req, res) => {
     service: "swift-transfer-backend",
     env: env.NODE_ENV ?? "development",
   });
-});
-
-app.use("/api/transfers", transfersRouter);
-
-// OPTIONAL: dacă vrei să vezi clar când CORS blochează (în loc de 500)
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && !allowedOrigins.includes(origin)) {
-    return res.status(403).json({
-      error: "CORS blocked",
-      origin,
-    });
-  }
-  next();
 });
 
 // error handler global (ca să nu mai primești HTML 500)
