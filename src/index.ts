@@ -22,30 +22,30 @@ const allowedOrigins = [
   "https://swift-transfer.app",
 ];
 
-// CORS
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      // allow server-to-server / curl / postman (no origin)
-      if (!origin) return cb(null, true);
+// IMPORTANT: refolosim aceleași opțiuni și la preflight
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, cb) => {
+    // allow server-to-server / curl / postman (no origin)
+    if (!origin) return cb(null, true);
 
-      if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
 
-      return cb(new Error(`CORS blocked for origin: ${origin}`));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+    return cb(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
 
-// IMPORTANT: allow preflight requests
-app.options("*", cors());
+app.use(cors(corsOptions));
 
-app.use("/api/transfers", transfersRouter);
+// Preflight (OPTIONS) trebuie să folosească aceleași corsOptions
+app.options("*", cors(corsOptions));
 
 // logging
 app.use(morgan("tiny"));
+
+app.use("/api/transfers", transfersRouter);
 
 app.get("/health", (_req, res) => {
   res.json({
