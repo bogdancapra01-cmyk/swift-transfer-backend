@@ -6,7 +6,6 @@ import "dotenv/config";
 import { env } from "./env";
 import transfersRouter from "./routes/transfers";
 
-
 const app = express();
 
 // securitate + parsing
@@ -14,11 +13,16 @@ app.use(helmet());
 app.use(express.json({ limit: "10mb" }));
 
 const allowedOrigins = [
+  // DEV
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+
+  // PROD
   "https://swift-transfer-fe-829099680012.europe-west1.run.app",
   "https://swift-transfer.app",
 ];
 
-// CORS (în dev e OK wide-open; în prod îl restrângem la domeniul tău)
+// CORS
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -29,12 +33,16 @@ app.use(
 
       return cb(new Error(`CORS blocked for origin: ${origin}`));
     },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
 
-app.use("/api/transfers", transfersRouter);
+// IMPORTANT: allow preflight requests
+app.options("*", cors());
 
+app.use("/api/transfers", transfersRouter);
 
 // logging
 app.use(morgan("tiny"));
@@ -43,7 +51,7 @@ app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     service: "swift-transfer-backend",
-    env: env.NODE_ENV ?? "development"
+    env: env.NODE_ENV ?? "development",
   });
 });
 
