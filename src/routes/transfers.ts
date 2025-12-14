@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import crypto from "crypto";
-import { uploadsBucket } from "../gcp/storage";
+import { getUploadsBucket } from "../gcp/storage";
 import { firestore } from "../gcp/firestore";
 
 const router = Router();
@@ -29,6 +29,8 @@ router.post("/init", async (req, res) => {
 
   const transferId = crypto.randomUUID();
   const createdAt = Date.now();
+  const uploadsBucket = getUploadsBucket();
+
 
   // pentru început: expiră upload-urile în 15 minute
   const expiresAt = Date.now() + 15 * 60 * 1000;
