@@ -31,13 +31,11 @@ router.post("/init", async (req, res) => {
   const createdAt = Date.now();
   const uploadsBucket = getUploadsBucket();
 
-
-  // pentru început: expiră upload-urile în 15 minute
-  const expiresAt = Date.now() + 15 * 60 * 1000;
+  // upload URLs expiră în 15 minute
+  const uploadExpiresAt = Date.now() + 15 * 60 * 1000;
 
   const uploads = await Promise.all(
     parsed.data.files.map(async (f) => {
-      // curățăm numele (simplu)
       const safeName = f.name.replace(/[^\w.\-()+ ]/g, "_");
       const objectPath = `uploads/${transferId}/${safeName}`;
 
@@ -46,8 +44,7 @@ router.post("/init", async (req, res) => {
       const [uploadUrl] = await fileRef.getSignedUrl({
         version: "v4",
         action: "write",
-        expires: expiresAt,
-        // IMPORTANT: păstrăm contentType pentru semnare
+        expires: uploadExpiresAt,
         contentType: f.type || "application/octet-stream",
       });
 
@@ -61,12 +58,10 @@ router.post("/init", async (req, res) => {
     })
   );
 
-  // salvăm transferul ca draft în Firestore
   await firestore.collection("transfers").doc(transferId).set({
     transferId,
     status: "draft",
     createdAt,
-    // nu setăm expiresAt final aici (draft), doar metadata
     files: uploads.map((u) => ({
       name: u.name,
       type: u.type,
@@ -79,13 +74,12 @@ router.post("/init", async (req, res) => {
     ok: true,
     transferId,
     uploads,
-    expiresAt,
+    expiresAt: uploadExpiresAt,
   });
 });
 
 /**
- * COMPLETE (mark transfer ready after uploads finished)
- * FE trimite: { transferId, files: [{ name, type, size, objectPath }] }
+ * COMPLETE (mark transfer ready)
  */
 const CompleteSchema = z.object({
   transferId: z.string().min(1),
@@ -115,9 +109,8 @@ router.post("/complete", async (req, res) => {
     return res.status(404).json({ ok: false, error: "Transfer not found" });
   }
 
-  // aici definim expirarea "share" (ex: 24h)
   const now = Date.now();
-  const expiresAt = now + 24 * 60 * 60 * 1000;
+  const expiresAt = now + 24 * 60 * 60 * 1000; // 24h
 
   await docRef.set(
     {
@@ -129,8 +122,6 @@ router.post("/complete", async (req, res) => {
     { merge: true }
   );
 
-  // Share URL: dacă ai FRONTEND_URL setat în Cloud Run -> îl folosește
-  // altfel pune fallback (poți schimba cu domeniul tău ulterior)
   const frontendBase =
     process.env.FRONTEND_URL ||
     "https://swift-transfer-fe-829099680012.europe-west1.run.app";
@@ -159,7 +150,6 @@ router.get("/:transferId", async (req, res) => {
 
   const data = snap.data() as any;
 
-  // opțional: dacă expiră, returnăm 410 Gone
   if (data?.expiresAt && typeof data.expiresAt === "number") {
     if (Date.now() > data.expiresAt) {
       return res.status(410).json({ ok: false, error: "Transfer expired" });
@@ -175,6 +165,65 @@ router.get("/:transferId", async (req, res) => {
     expiresAt: data.expiresAt ?? null,
     files: data.files ?? [],
   });
+});
+
+/**
+ * GET signed download URL for a file (by index)
+ */
+router.get("/:transferId/files/:index/download", async (req, res) => {
+  try {
+    const transferId = req.params.transferId;
+    const index = Number(req.params.index);
+
+    if (Number.isNaN(index) || index < 0) {
+      return res.status(400).json({ ok: false, error: "Invalid file index" });
+    }
+
+    const docRef = firestore.collection("transfers").doc(transferId);
+    const snap = await docRef.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({ ok: false, error: "Transfer not found" });
+    }
+
+    const data = snap.data() as any;
+
+    if (data?.status !== "ready") {
+      return res.status(409).json({ ok: false, error: "Transfer not ready" });
+    }
+
+    if (
+      data?.expiresAt &&
+      typeof data.expiresAt === "number" &&
+      Date.now() > data.expiresAt
+    ) {
+      return res.status(410).json({ ok: false, error: "Transfer expired" });
+    }
+
+    const files = Array.isArray(data?.files) ? data.files : [];
+    const fileMeta = files[index];
+
+    if (!fileMeta?.objectPath) {
+      return res.status(404).json({ ok: false, error: "File not found" });
+    }
+
+    const uploadsBucket = getUploadsBucket();
+    const gcsFile = uploadsBucket.file(fileMeta.objectPath);
+
+    const [url] = await gcsFile.getSignedUrl({
+      version: "v4",
+      action: "read",
+      expires: Date.now() + 10 * 60 * 1000, // 10 min
+      responseDisposition: `attachment; filename="${fileMeta.name ?? "download"}"`,
+    });
+
+    return res.json({ ok: true, url });
+  } catch (e: any) {
+    console.error("download-url error:", e);
+    return res
+      .status(500)
+      .json({ ok: false, error: e?.message ?? "Internal error" });
+  }
 });
 
 export default router;
