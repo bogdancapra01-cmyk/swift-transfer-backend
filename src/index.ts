@@ -14,7 +14,7 @@ app.use(helmet());
 app.use(express.json({ limit: "10mb" }));
 
 const allowedOrigins = [
-  "https://<URL-FRONTEND-CLOUD-RUN>",
+  "https://swift-transfer-fe-829099680012.europe-west1.run.app",
   "https://swift-transfer.app",
 ];
 
@@ -22,9 +22,12 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true); // Postman/curl
+      // allow server-to-server / curl / postman (no origin)
+      if (!origin) return cb(null, true);
+
       if (allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error("Not allowed by CORS"));
+
+      return cb(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
   })
