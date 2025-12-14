@@ -26,8 +26,11 @@ const allowedOrigins = [
 const corsOptions: cors.CorsOptions = {
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
+
     if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(null, false); // IMPORTANT: nu aruncăm Error
+
+    // IMPORTANT: nu aruncăm Error -> evităm 500 pe preflight
+    return cb(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -35,7 +38,9 @@ const corsOptions: cors.CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+
+// ✅ FIX: NU folosi "*" (crapă cu path-to-regexp). Folosește "/(.*)" sau regex.
+app.options(/.*/, cors(corsOptions));
 
 // routes
 app.use("/api/transfers", transfersRouter);
@@ -48,7 +53,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// ✅ FIX: Cloud Run PORT
+// ✅ Cloud Run PORT
 const port = Number(process.env.PORT || env.PORT || 8080);
 
 app.listen(port, () => {
