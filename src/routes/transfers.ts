@@ -4,6 +4,8 @@ import crypto from "crypto";
 import { getUploadsBucket } from "../gcp/storage";
 import { firestore } from "../gcp/firestore";
 import fetch from "node-fetch";
+import archiver from "archiver";
+
 
 
 const router = Router();
@@ -335,5 +337,94 @@ router.post("/:transferId/email", async (req, res) => {
       .json({ ok: false, error: e?.message ?? "Internal error" });
   }
 });
+
+/**
+ * DOWNLOAD ALL as ZIP
+ * GET /api/transfers/:transferId/download.zip
+ */
+router.get("/:transferId/download.zip", async (req, res) => {
+  try {
+    const transferId = req.params.transferId;
+
+    const docRef = firestore.collection("transfers").doc(transferId);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      return res.status(404).json({ ok: false, error: "Transfer not found" });
+    }
+
+    const data = snap.data() as any;
+
+    if (data?.status !== "ready") {
+      return res.status(409).json({ ok: false, error: "Transfer not ready" });
+    }
+
+    if (
+      data?.expiresAt &&
+      typeof data.expiresAt === "number" &&
+      Date.now() > data.expiresAt
+    ) {
+      return res.status(410).json({ ok: false, error: "Transfer expired" });
+    }
+
+    const files = Array.isArray(data?.files) ? data.files : [];
+    if (!files.length) {
+      return res.status(404).json({ ok: false, error: "No files found" });
+    }
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="swift-transfer-${transferId}.zip"`
+    );
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+
+    archive.on("error", (err) => {
+      console.error("zip error:", err);
+      if (!res.headersSent) res.status(500);
+      res.end();
+    });
+
+    archive.pipe(res);
+
+    const uploadsBucket = getUploadsBucket();
+
+    // ca să evităm nume duplicate în ZIP
+    const usedNames = new Set<string>();
+
+    for (let i = 0; i < files.length; i++) {
+      const meta = files[i];
+      const objectPath = meta?.objectPath;
+      const originalName = String(meta?.name ?? `file-${i + 1}`);
+
+      if (!objectPath) continue;
+
+      // sanitize + uniqueness
+      const safeBase = originalName.replace(/[^\w.\-()+ ]/g, "_") || `file-${i + 1}`;
+      let finalName = safeBase;
+      let counter = 2;
+      while (usedNames.has(finalName)) {
+        const dot = safeBase.lastIndexOf(".");
+        if (dot > 0) {
+          finalName = `${safeBase.slice(0, dot)} (${counter})${safeBase.slice(dot)}`;
+        } else {
+          finalName = `${safeBase} (${counter})`;
+        }
+        counter++;
+      }
+      usedNames.add(finalName);
+
+      const gcsFile = uploadsBucket.file(objectPath);
+      archive.append(gcsFile.createReadStream(), { name: finalName });
+    }
+
+    // finalize streaming ZIP
+    void archive.finalize();
+  } catch (e: any) {
+    console.error("download-zip error:", e);
+    return res.status(500).json({ ok: false, error: e?.message ?? "Internal error" });
+  }
+});
+
 
 export default router;
