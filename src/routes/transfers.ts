@@ -9,6 +9,8 @@ import archiver from "archiver";
 
 
 const router = Router();
+const SHARE_TTL_DAYS = 14;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * INIT (create signed upload URLs)
@@ -114,7 +116,7 @@ router.post("/complete", async (req, res) => {
   }
 
   const now = Date.now();
-  const expiresAt = now + 24 * 60 * 60 * 1000; // 24h
+  const expiresAt = now + SHARE_TTL_DAYS * MS_PER_DAY; // 14 days
 
   await docRef.set(
     {
