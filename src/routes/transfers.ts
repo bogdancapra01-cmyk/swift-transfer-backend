@@ -5,6 +5,8 @@ import { getUploadsBucket } from "../gcp/storage";
 import { firestore } from "../gcp/firestore";
 import fetch from "node-fetch";
 import archiver from "archiver";
+import { requireAuth, AuthedRequest } from "../middleware/auth";
+
 
 
 
@@ -27,7 +29,7 @@ const InitSchema = z.object({
     .min(1),
 });
 
-router.post("/init", async (req, res) => {
+router.post("/init", requireAuth, async (req: AuthedRequest, res) => {
   const parsed = InitSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ ok: false, error: parsed.error.flatten() });
@@ -101,7 +103,7 @@ const CompleteSchema = z.object({
     .min(1),
 });
 
-router.post("/complete", async (req, res) => {
+router.post("/complete", requireAuth, async (req: AuthedRequest, res) => {
   const parsed = CompleteSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ ok: false, error: parsed.error.flatten() });
@@ -145,7 +147,7 @@ router.post("/complete", async (req, res) => {
 /**
  * GET transfer metadata (for share page)
  */
-router.get("/:transferId", async (req, res) => {
+router.get("/:transferId", requireAuth, async (req: AuthedRequest, res) => {
   const transferId = req.params.transferId;
 
   const docRef = firestore.collection("transfers").doc(transferId);
