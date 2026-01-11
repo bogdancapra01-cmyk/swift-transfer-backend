@@ -6,7 +6,9 @@ function initFirebaseAdmin() {
   // Pe Cloud Run (cu service account), admin.initializeApp() merge fără chei,
   // folosind implicit credentials ale runtime-ului GCP.
   if (!admin.apps.length) {
-    admin.initializeApp();
+     admin.initializeApp({
+    projectId: process.env.GCP_PROJECT_ID, // sau GOOGLE_CLOUD_PROJECT
+  });
   }
 }
 
