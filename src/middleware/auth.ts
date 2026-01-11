@@ -2,33 +2,32 @@ import type { Request, Response, NextFunction } from "express";
 import admin from "firebase-admin";
 
 function initFirebaseAdmin() {
-  // IMPORTANT:
-  // Pe Cloud Run (cu service account), admin.initializeApp() merge fără chei,
-  // folosind implicit credentials ale runtime-ului GCP.
-  if (!admin.apps.length) {
-     admin.initializeApp({
-    projectId: process.env.GCP_PROJECT_ID, // sau GOOGLE_CLOUD_PROJECT
-  });
-  }
-}
-
-export type AuthedRequest = Request & { user?: { uid: string; email?: string | null } };
-
-export async function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
-  try {
-    function initFirebaseAdmin() {
   if (!admin.apps.length) {
     admin.initializeApp({
-      projectId: process.env.FIREBASE_PROJECT_ID, // <- IMPORTANT
+      projectId: process.env.FIREBASE_PROJECT_ID, // swift-transfer-app
     });
   }
 }
+
+export type AuthedRequest = Request & {
+  user?: { uid: string; email?: string | null };
+};
+
+export async function requireAuth(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    initFirebaseAdmin(); // <-- IMPORTANT: o chemi aici
 
     const header = req.headers.authorization || "";
     const match = header.match(/^Bearer\s+(.+)$/i);
 
     if (!match) {
-      return res.status(401).json({ ok: false, error: "Missing Authorization: Bearer <token>" });
+      return res
+        .status(401)
+        .json({ ok: false, error: "Missing Authorization: Bearer <token>" });
     }
 
     const token = match[1];
@@ -41,6 +40,7 @@ export async function requireAuth(req: AuthedRequest, res: Response, next: NextF
 
     return next();
   } catch (e: any) {
+    console.error("verifyIdToken failed:", e?.message); // temporar, foarte util
     return res.status(401).json({ ok: false, error: "Invalid or expired token" });
   }
 }
