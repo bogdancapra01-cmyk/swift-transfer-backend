@@ -16,7 +16,13 @@ export type AuthedRequest = Request & { user?: { uid: string; email?: string | n
 
 export async function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   try {
-    initFirebaseAdmin();
+    function initFirebaseAdmin() {
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      projectId: process.env.FIREBASE_PROJECT_ID, // <- IMPORTANT
+    });
+  }
+}
 
     const header = req.headers.authorization || "";
     const match = header.match(/^Bearer\s+(.+)$/i);
