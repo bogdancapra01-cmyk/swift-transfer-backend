@@ -342,6 +342,37 @@ router.post("/:transferId/email", async (req, res) => {
   }
 });
 
+router.get("/my", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const userId = req.user.uid;
+
+    const snapshot = await firestore
+      .collection("transfers")
+      .where("userId", "==", userId)
+      .get();
+
+    const transfers = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => {
+        const aMs =
+          a.createdAt?.toMillis?.() ??
+          (typeof a.createdAt === "number" ? a.createdAt : 0);
+        const bMs =
+          b.createdAt?.toMillis?.() ??
+          (typeof b.createdAt === "number" ? b.createdAt : 0);
+        return bMs - aMs; // newest first
+      });
+
+    res.json({ transfers });
+  } catch (error) {
+    console.error("Failed to fetch my uploads:", error);
+    res.status(500).json({ error: "Failed to fetch uploads" });
+  }
+});
 /**
  * DOWNLOAD ALL as ZIP
  * GET /api/transfers/:transferId/download.zip
@@ -381,37 +412,7 @@ router.get("/:transferId/download.zip", async (req, res) => {
       `attachment; filename="swift-transfer-${transferId}.zip"`
     );
 
-    router.get("/my", requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const userId = req.user.uid;
-
-    const snapshot = await firestore
-      .collection("transfers")
-      .where("userId", "==", userId)
-      .get();
-
-    const transfers = snapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .sort((a: any, b: any) => {
-        const aMs =
-          a.createdAt?.toMillis?.() ??
-          (typeof a.createdAt === "number" ? a.createdAt : 0);
-        const bMs =
-          b.createdAt?.toMillis?.() ??
-          (typeof b.createdAt === "number" ? b.createdAt : 0);
-        return bMs - aMs; // newest first
-      });
-
-    res.json({ transfers });
-  } catch (error) {
-    console.error("Failed to fetch my uploads:", error);
-    res.status(500).json({ error: "Failed to fetch uploads" });
-  }
-});
+    
 
 
 
