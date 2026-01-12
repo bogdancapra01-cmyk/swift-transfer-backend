@@ -21,6 +21,7 @@ app.use(morgan("tiny"));
 const allowedOrigins = [
   "https://swift-transfer-fe-829099680012.europe-west1.run.app",
   "https://swift-transfer.app",
+  "http://localhost:5173", // Vite dev
 ];
 
 const corsOptions: cors.CorsOptions = {
