@@ -190,7 +190,10 @@ router.get("/my", requireAuth, async (req: AuthedRequest, res) => {
 /**
  * GET transfer metadata (for share page)
  */
-router.get("/:transferId", requireAuth, async (req: AuthedRequest, res) => {
+/**
+ * GET transfer metadata (for share page)
+ */
+router.get("/:transferId", async (req: AuthedRequest, res) => {
   const transferId = req.params.transferId;
 
   const docRef = firestore.collection("transfers").doc(transferId);
@@ -217,6 +220,7 @@ router.get("/:transferId", requireAuth, async (req: AuthedRequest, res) => {
     files: data.files ?? [],
   });
 });
+
 
 /**
  * GET signed download URL for a file (by index)
