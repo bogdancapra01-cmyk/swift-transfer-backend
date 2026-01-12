@@ -35,6 +35,10 @@ router.post("/init", requireAuth, async (req: AuthedRequest, res) => {
     return res.status(400).json({ ok: false, error: parsed.error.flatten() });
   }
 
+  if (!req.user) {
+  return res.status(401).json({ ok: false, error: "Unauthorized" });
+}
+
   const transferId = crypto.randomUUID();
   const createdAt = Date.now();
   const uploadsBucket = getUploadsBucket();
@@ -68,6 +72,7 @@ router.post("/init", requireAuth, async (req: AuthedRequest, res) => {
 
   await firestore.collection("transfers").doc(transferId).set({
     transferId,
+    userId: req.user.uid, // ✅ ADD THIS
     status: "draft",
     createdAt,
     files: uploads.map((u) => ({
@@ -109,6 +114,11 @@ router.post("/complete", requireAuth, async (req: AuthedRequest, res) => {
     return res.status(400).json({ ok: false, error: parsed.error.flatten() });
   }
 
+  if (!req.user) {
+  return res.status(401).json({ ok: false, error: "Unauthorized" });
+}
+
+
   const { transferId, files } = parsed.data;
 
   const docRef = firestore.collection("transfers").doc(transferId);
@@ -126,6 +136,7 @@ router.post("/complete", requireAuth, async (req: AuthedRequest, res) => {
       completedAt: now,
       expiresAt,
       files,
+      userId: req.user.uid,
     },
     { merge: true }
   );
